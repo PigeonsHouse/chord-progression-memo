@@ -80,6 +80,26 @@ http://localhost:5173/auth/google/callback
    pnpm deploy
    ```
 
+6. カスタムドメインを使う場合は、ドメインがCloudflareのアクティブなZoneへ登録されていることを確認します。既存の同名CNAMEレコードがある場合は先に削除してください。
+
+   ```sh
+   export TF_VAR_custom_domain_hostname="chords.example.com"
+   export TF_VAR_cloudflare_zone_name="example.com"
+
+   cd terraform
+   terraform apply
+   ```
+
+   Workerが先に存在する必要があるため、カスタムドメイン用の`terraform apply`は初回の`pnpm deploy`後に実行します。CloudflareがWorker用DNSレコードとTLS証明書を自動作成します。
+
+7. Google Cloud ConsoleのOAuthクライアントへ、本番のコールバックURLを追加します。
+
+   ```text
+   https://chords.example.com/auth/google/callback
+   ```
+
+カスタムドメインもTerraformで管理する場合、Terraform用APIトークンには`Account / D1 / Edit`に加えて`Account / Workers Scripts / Edit`が必要です。対象アカウントだけに制限してください。
+
 許可ユーザーは `ALLOWED_EMAILS` にカンマ区切りで設定します。ログイン済みでも一覧にないユーザーによる更新APIは403になります。曲メモの編集権限は作成者本人に限定されます。
 
 ## 品質確認
