@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chord-progression-memo",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-07-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/auth/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "chord-progression-memo",
+      "database_id": "7a3fdd89-22c3-4106-9ea3-ec27c1eb7d8a",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

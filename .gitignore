@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.wrangler/
+.dev.vars*
+.env*
+!.env.example
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform/
+terraform/.terraform.lock.hcl

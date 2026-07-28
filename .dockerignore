@@ -1,0 +1,9 @@
+.git
+.wrangler
+.dev.vars*
+.env*
+dist
+node_modules
+*.tsbuildinfo
+terraform/.terraform
+terraform/*.tfstate*
