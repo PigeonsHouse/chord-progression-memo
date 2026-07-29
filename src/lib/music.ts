@@ -1,7 +1,34 @@
 import type { ChordBlock, ChordQuality, KeyChange } from "../../shared/types";
 
-export const KEY_NAMES = ["C", "D♭", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
-const ROMAN_SHARP = ["Ⅰ", "Ⅰ♯", "Ⅱ", "Ⅱ♯", "Ⅲ", "Ⅳ", "Ⅳ♯", "Ⅴ", "Ⅴ♯", "Ⅵ", "Ⅵ♯", "Ⅶ"];
+export const KEY_NAMES = [
+  "C",
+  "D♭",
+  "D",
+  "E♭",
+  "E",
+  "F",
+  "F♯",
+  "G",
+  "A♭",
+  "A",
+  "B♭",
+  "B",
+];
+export const DEFAULT_BEATS_PER_MEASURE = 4;
+const ROMAN_SHARP = [
+  "Ⅰ",
+  "Ⅰ♯",
+  "Ⅱ",
+  "Ⅱ♯",
+  "Ⅲ",
+  "Ⅳ",
+  "Ⅳ♯",
+  "Ⅴ",
+  "Ⅴ♯",
+  "Ⅵ",
+  "Ⅵ♯",
+  "Ⅶ",
+];
 const QUALITY_SUFFIX: Record<ChordQuality, string> = {
   major: "",
   minor: "m",
@@ -13,7 +40,11 @@ const QUALITY_SUFFIX: Record<ChordQuality, string> = {
 
 export type FunctionColor = "T" | "P" | "Pm" | "S" | "Sm" | "D" | "Dm";
 
-export function degreeLabel(degree: number, quality: ChordQuality | null, bass = false) {
+export function degreeLabel(
+  degree: number,
+  quality: ChordQuality | null,
+  bass = false,
+) {
   const normalized = mod12(degree);
   if (!bass && quality === "major") {
     if (normalized === 3) return "♭Ⅲ";
@@ -23,7 +54,9 @@ export function degreeLabel(degree: number, quality: ChordQuality | null, bass =
   return ROMAN_SHARP[normalized];
 }
 
-export function chordLabel(block: Pick<ChordBlock, "degree" | "quality" | "bassDegree">) {
+export function chordLabel(
+  block: Pick<ChordBlock, "degree" | "quality" | "bassDegree">,
+) {
   if (block.degree === null || block.quality === null) return "N.C.";
   const root = degreeLabel(block.degree, block.quality);
   const bass =
@@ -33,19 +66,25 @@ export function chordLabel(block: Pick<ChordBlock, "degree" | "quality" | "bassD
   return `${root}${QUALITY_SUFFIX[block.quality]}${bass}`;
 }
 
-export function functionColor(block: Pick<ChordBlock, "degree" | "quality" | "bassDegree">): FunctionColor | null {
+export function functionColor(
+  block: Pick<ChordBlock, "degree" | "quality" | "bassDegree">,
+): FunctionColor | null {
   if (block.degree === null || block.quality === null) return null;
   const degree = mod12(block.degree);
   if (degree === 10 && block.quality === "major") return "Dm";
   if (degree === 0 && block.quality === "augmented") return "T";
   if (degree === 6 && block.quality === "minor") return "P";
   if (degree === 4 && block.quality === "half_diminished7") return "T";
+  if (degree === 4 && block.quality === "minor") return "T";
+  if (degree === 4 && block.quality === "dominant7") return "T";
   if (degree === 0 && block.quality === "minor") return "Pm";
   if (degree === 3 && block.quality === "major") return "Pm";
   if (degree === 5 && block.quality === "minor") return "Sm";
   if (degree === 8 && block.quality === "major") return "Sm";
   if (degree === 7 && block.quality === "minor") return "Dm";
   if (degree === 10 && block.quality === "minor") return "Pm";
+  if (degree === 11 && block.quality === "diminished") return "D";
+  if (degree === 11 && block.quality === "dominant7") return "D";
   if ([0, 9].includes(degree)) return "T";
   if ([1, 6].includes(degree)) return "P";
   if ([2, 5, 11].includes(degree)) return "S";
@@ -61,17 +100,34 @@ export interface BeatValue {
 }
 
 export function expandBlocks(blocks: ChordBlock[]): BeatValue[] {
-  const length = Math.max(0, ...blocks.map((block) => block.startBeat + block.duration));
-  const beats = Array.from({ length }, (): BeatValue => ({ degree: null, quality: null, bassDegree: null }));
+  const length = Math.max(
+    0,
+    ...blocks.map((block) => block.startBeat + block.duration),
+  );
+  const beats = Array.from(
+    { length },
+    (): BeatValue => ({ degree: null, quality: null, bassDegree: null }),
+  );
   for (const block of blocks) {
-    for (let i = block.startBeat; i < block.startBeat + block.duration; i += 1) {
-      beats[i] = { degree: block.degree, quality: block.quality, bassDegree: block.bassDegree };
+    for (
+      let i = block.startBeat;
+      i < block.startBeat + block.duration;
+      i += 1
+    ) {
+      beats[i] = {
+        degree: block.degree,
+        quality: block.quality,
+        bassDegree: block.bassDegree,
+      };
     }
   }
   return beats;
 }
 
-export function compressBeats(beats: BeatValue[]): ChordBlock[] {
+export function compressBeats(
+  beats: BeatValue[],
+  beatsPerMeasure = DEFAULT_BEATS_PER_MEASURE,
+): ChordBlock[] {
   const blocks: ChordBlock[] = [];
   let start = 0;
   while (start < beats.length) {
@@ -80,7 +136,8 @@ export function compressBeats(beats: BeatValue[]): ChordBlock[] {
     while (
       start + duration < beats.length &&
       duration < 4 &&
-      Math.floor(start / 4) === Math.floor((start + duration) / 4) &&
+      Math.floor(start / beatsPerMeasure) ===
+        Math.floor((start + duration) / beatsPerMeasure) &&
       sameBeat(value, beats[start + duration])
     ) {
       duration += 1;
@@ -96,44 +153,121 @@ export function compressBeats(beats: BeatValue[]): ChordBlock[] {
   return blocks;
 }
 
-export function applyAt(blocks: ChordBlock[], startBeat: number, width: number, value: BeatValue) {
+export function applyAt(
+  blocks: ChordBlock[],
+  startBeat: number,
+  width: number,
+  value: BeatValue,
+  beatsPerMeasure = DEFAULT_BEATS_PER_MEASURE,
+) {
   const beats = expandBlocks(blocks);
   while (beats.length < startBeat + width) {
     beats.push({ degree: null, quality: null, bassDegree: null });
   }
   for (let i = startBeat; i < startBeat + width; i += 1) beats[i] = value;
-  while (beats.length % 4 !== 0) beats.push({ degree: null, quality: null, bassDegree: null });
-  return compressBeats(beats);
+  while (beats.length % beatsPerMeasure !== 0)
+    beats.push({ degree: null, quality: null, bassDegree: null });
+  return compressBeats(beats, beatsPerMeasure);
 }
 
-export function addMeasure(blocks: ChordBlock[]) {
+export function addMeasure(
+  blocks: ChordBlock[],
+  beatsPerMeasure = DEFAULT_BEATS_PER_MEASURE,
+) {
   const beats = expandBlocks(blocks);
-  while (beats.length % 4 !== 0) beats.push({ degree: null, quality: null, bassDegree: null });
-  beats.push(...Array.from({ length: 4 }, () => ({ degree: null, quality: null, bassDegree: null })));
-  return compressBeats(beats);
+  while (beats.length % beatsPerMeasure !== 0)
+    beats.push({ degree: null, quality: null, bassDegree: null });
+  beats.push(
+    ...Array.from({ length: beatsPerMeasure }, () => ({
+      degree: null,
+      quality: null,
+      bassDegree: null,
+    })),
+  );
+  return compressBeats(beats, beatsPerMeasure);
 }
 
-export function removeMeasure(blocks: ChordBlock[], measureIndex: number) {
+export function reflowTimeSignature(
+  blocks: ChordBlock[],
+  beatsPerMeasure: number,
+) {
+  return compressBeats(expandBlocks(blocks), beatsPerMeasure);
+}
+
+export function insertMeasures(
+  blocks: ChordBlock[],
+  measureIndex: number,
+  count: number,
+  beatsPerMeasure = DEFAULT_BEATS_PER_MEASURE,
+) {
   const beats = expandBlocks(blocks);
-  if (beats.length <= 4) return compressBeats([
-    { degree: null, quality: null, bassDegree: null },
-    { degree: null, quality: null, bassDegree: null },
-    { degree: null, quality: null, bassDegree: null },
-    { degree: null, quality: null, bassDegree: null },
-  ]);
-  beats.splice(measureIndex * 4, 4);
-  return compressBeats(beats);
+  while (beats.length % beatsPerMeasure !== 0)
+    beats.push({ degree: null, quality: null, bassDegree: null });
+  const insertionBeat = Math.max(
+    0,
+    Math.min(beats.length, measureIndex * beatsPerMeasure),
+  );
+  beats.splice(
+    insertionBeat,
+    0,
+    ...Array.from({ length: count * beatsPerMeasure }, () => ({
+      degree: null,
+      quality: null,
+      bassDegree: null,
+    })),
+  );
+  return compressBeats(beats, beatsPerMeasure);
 }
 
-export function positionAfterMeasureRemoval(position: number, measureIndex: number) {
-  const start = measureIndex * 4;
-  const end = start + 4;
+export function positionAfterMeasureInsertion(
+  position: number,
+  measureIndex: number,
+  count: number,
+  beatsPerMeasure = DEFAULT_BEATS_PER_MEASURE,
+) {
+  const insertionBeat = measureIndex * beatsPerMeasure;
+  return position >= insertionBeat
+    ? position + count * beatsPerMeasure
+    : position;
+}
+
+export function removeMeasure(
+  blocks: ChordBlock[],
+  measureIndex: number,
+  beatsPerMeasure = DEFAULT_BEATS_PER_MEASURE,
+) {
+  const beats = expandBlocks(blocks);
+  if (beats.length <= beatsPerMeasure) {
+    return compressBeats(
+      Array.from({ length: beatsPerMeasure }, () => ({
+        degree: null,
+        quality: null,
+        bassDegree: null,
+      })),
+      beatsPerMeasure,
+    );
+  }
+  beats.splice(measureIndex * beatsPerMeasure, beatsPerMeasure);
+  return compressBeats(beats, beatsPerMeasure);
+}
+
+export function positionAfterMeasureRemoval(
+  position: number,
+  measureIndex: number,
+  beatsPerMeasure = DEFAULT_BEATS_PER_MEASURE,
+) {
+  const start = measureIndex * beatsPerMeasure;
+  const end = start + beatsPerMeasure;
   if (position <= start) return position;
-  if (position >= end) return position - 4;
+  if (position >= end) return position - beatsPerMeasure;
   return start;
 }
 
-export function keyAtBeat(initialKey: number, changes: KeyChange[], beat: number) {
+export function keyAtBeat(
+  initialKey: number,
+  changes: KeyChange[],
+  beat: number,
+) {
   return changes
     .filter((change) => change.startBeat <= beat)
     .sort((a, b) => a.startBeat - b.startBeat)
@@ -149,7 +283,11 @@ const INTERVALS: Record<ChordQuality, number[]> = {
   half_diminished7: [0, 3, 6, 10],
 };
 
-export function midiVoicing(block: ChordBlock, keyPitchClass: number, previousUpper: number[] = []): number[] {
+export function midiVoicing(
+  block: ChordBlock,
+  keyPitchClass: number,
+  previousUpper: number[] = [],
+): number[] {
   if (block.degree === null || block.quality === null) return [];
   const rootPc = mod12(keyPitchClass + block.degree);
   const bassPc = mod12(keyPitchClass + (block.bassDegree ?? block.degree));
@@ -168,22 +306,33 @@ export function midiVoicing(block: ChordBlock, keyPitchClass: number, previousUp
     for (let i = 0; i < inversion; i += 1) notes[i] += 12;
     return notes.sort((a, b) => a - b);
   });
-  const upper = inversions.sort((a, b) => voicingScore(a, previousUpper) - voicingScore(b, previousUpper))[0];
+  const upper = inversions.sort(
+    (a, b) => voicingScore(a, previousUpper) - voicingScore(b, previousUpper),
+  )[0];
   return [bass, ...upper].filter((note) => note >= 24 && note <= 95);
 }
 
 function midiInRootRange(pitchClass: number) {
-  const candidates = Array.from({ length: 13 }, (_, i) => 36 + i).filter((note) => note % 12 === pitchClass);
+  const candidates = Array.from({ length: 13 }, (_, i) => 36 + i).filter(
+    (note) => note % 12 === pitchClass,
+  );
   return candidates.sort((a, b) => Math.abs(a - 42) - Math.abs(b - 42))[0];
 }
 
 function sameBeat(a: BeatValue, b: BeatValue) {
-  return a.degree === b.degree && a.quality === b.quality && a.bassDegree === b.bassDegree;
+  return (
+    a.degree === b.degree &&
+    a.quality === b.quality &&
+    a.bassDegree === b.bassDegree
+  );
 }
 
 function voicingScore(notes: number[], previous: number[]) {
   if (previous.length === notes.length) {
-    return notes.reduce((score, note, index) => score + Math.abs(note - previous[index]), 0);
+    return notes.reduce(
+      (score, note, index) => score + Math.abs(note - previous[index]),
+      0,
+    );
   }
   return notes.reduce((score, note) => score + Math.abs(note - 60), 0);
 }

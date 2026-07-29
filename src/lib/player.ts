@@ -1,6 +1,8 @@
 import type { ChordBlock, KeyChange } from "../../shared/types";
 import { keyAtBeat, midiVoicing } from "./music";
 
+const QUARTER_NOTE_BEAT_UNIT = 4;
+
 export class ChordPlayer {
   private context: AudioContext | null = null;
   private gain: GainNode | null = null;
@@ -19,8 +21,10 @@ export class ChordPlayer {
   async play(
     blocks: ChordBlock[],
     bpm: number,
+    beatUnit: number,
     initialKey: number,
     keyChanges: KeyChange[],
+    startBeat: number,
     onBeat: (beat: number | null) => void,
   ) {
     this.stop(onBeat);
@@ -31,7 +35,9 @@ export class ChordPlayer {
     }
     this.gain.gain.setValueAtTime(this.volume, this.context.currentTime);
     await this.context.resume();
-    const playable = blocks.filter((block) => block.degree !== null);
+    const playable = blocks.filter(
+      (block) => block.degree !== null && block.startBeat + block.duration > startBeat,
+    );
     let previousUpper: number[] = [];
     const voicings = new Map<string, number[]>();
     for (const block of playable) {
@@ -45,11 +51,12 @@ export class ChordPlayer {
     }
     const notes = [...new Set([...voicings.values()].flat())];
     await Promise.all(notes.map((note) => this.load(note)));
-    const secondsPerBeat = 60 / bpm;
+    const secondsPerBeat = 60 / bpm * (QUARTER_NOTE_BEAT_UNIT / beatUnit);
     const startAt = this.context.currentTime + 0.08;
     for (const block of playable) {
-      const at = startAt + block.startBeat * secondsPerBeat;
-      const stopAt = at + block.duration * secondsPerBeat;
+      const effectiveStart = Math.max(block.startBeat, startBeat);
+      const at = startAt + (effectiveStart - startBeat) * secondsPerBeat;
+      const stopAt = at + (block.startBeat + block.duration - effectiveStart) * secondsPerBeat;
       for (const note of voicings.get(block.id) ?? []) {
         const source = this.context.createBufferSource();
         source.buffer = this.buffers.get(note)!;
@@ -62,7 +69,7 @@ export class ChordPlayer {
     const totalBeats = Math.max(...blocks.map((block) => block.startBeat + block.duration), 0);
     const started = performance.now();
     this.timer = window.setInterval(() => {
-      const beat = Math.floor((performance.now() - started) / 1000 / secondsPerBeat);
+      const beat = startBeat + Math.floor((performance.now() - started) / 1000 / secondsPerBeat);
       if (beat >= totalBeats) this.stop(onBeat);
       else onBeat(beat);
     }, 50);

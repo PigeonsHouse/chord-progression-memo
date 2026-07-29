@@ -40,6 +40,8 @@ const blockSchema = z.object({
 const songUpdateSchema = z.object({
   title: z.string().trim().min(1).max(200),
   bpm: z.number().int().min(20).max(400),
+  timeSignatureNumerator: z.number().int().min(2).max(12),
+  timeSignatureDenominator: z.union([z.literal(2), z.literal(4), z.literal(8)]),
   initialKey: z.number().int().min(0).max(11),
   sourceUrl: z.string().url().max(2000).nullable().or(z.literal("")),
   status: z.enum(["draft", "published"]),
@@ -60,6 +62,16 @@ const songUpdateSchema = z.object({
       startBeat: z.number().int().min(0),
       endBeat: z.number().int().positive(),
     }).refine((value) => value.endBeat > value.startBeat),
+  ),
+  sections: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string().trim().min(1).max(50),
+      startBeat: z.number().int().min(0),
+    }),
+  ).max(100).refine(
+    (sections) => new Set(sections.map((section) => section.startBeat)).size === sections.length,
+    "Only one section can start at each beat",
   ),
 });
 
@@ -222,7 +234,7 @@ app.put("/api/songs/:id", async (c) => {
   const parsed = songUpdateSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: "Invalid data", details: parsed.error.flatten() }, 400);
   const data = parsed.data;
-  const invalid = validateTimeline(data.blocks);
+  const invalid = validateTimeline(data.blocks, data.timeSignatureNumerator);
   if (invalid) return c.json({ error: invalid }, 400);
   const current = await c.env.DB.prepare(
     "SELECT created_by_user_id, status, published_at FROM songs WHERE id = ?",
@@ -232,12 +244,15 @@ app.put("/api/songs/:id", async (c) => {
   const publishedAt =
     data.status === "published" ? current.published_at ?? new Date().toISOString() : current.published_at;
   const updated = await c.env.DB.prepare(
-    `UPDATE songs SET title = ?, bpm = ?, initial_key = ?, source_url = ?,
+    `UPDATE songs SET title = ?, bpm = ?, time_signature_numerator = ?,
+      time_signature_denominator = ?, initial_key = ?, source_url = ?,
       status = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP, version = version + 1
      WHERE id = ? AND version = ?`,
   ).bind(
     data.title,
     data.bpm,
+    data.timeSignatureNumerator,
+    data.timeSignatureDenominator,
     data.initialKey,
     data.sourceUrl || null,
     data.status,
@@ -252,6 +267,7 @@ app.put("/api/songs/:id", async (c) => {
     c.env.DB.prepare("DELETE FROM key_changes WHERE song_id = ?").bind(c.req.param("id")),
     c.env.DB.prepare("DELETE FROM song_tags WHERE song_id = ?").bind(c.req.param("id")),
     c.env.DB.prepare("DELETE FROM song_progressions WHERE song_id = ?").bind(c.req.param("id")),
+    c.env.DB.prepare("DELETE FROM song_sections WHERE song_id = ?").bind(c.req.param("id")),
   ];
   for (const block of data.blocks) {
     statements.push(c.env.DB.prepare(
@@ -294,6 +310,11 @@ app.put("/api/songs/:id", async (c) => {
          VALUES (?, ?, ?, ?, ?)`,
       ).bind(range.id, c.req.param("id"), nameId, range.startBeat, range.endBeat),
     );
+  }
+  for (const section of data.sections) {
+    statements.push(c.env.DB.prepare(
+      "INSERT INTO song_sections (id, song_id, name, start_beat) VALUES (?, ?, ?, ?)",
+    ).bind(section.id, c.req.param("id"), section.name.trim(), section.startBeat));
   }
   await c.env.DB.batch(statements);
   return c.json({ version: data.version + 1, publishedAt });
@@ -358,12 +379,15 @@ function requireAllowed(user: SessionUser | null): SessionUser | Response {
   return user?.allowed ? user : Response.json({ error: "Forbidden" }, { status: 403 });
 }
 
-function validateTimeline(blocks: z.infer<typeof blockSchema>[]) {
+function validateTimeline(blocks: z.infer<typeof blockSchema>[], beatsPerMeasure: number) {
   const sorted = [...blocks].sort((a, b) => a.startBeat - b.startBeat);
   let end = 0;
   for (const block of sorted) {
     if (block.startBeat !== end) return "Chord blocks must form a continuous timeline";
-    if (Math.floor(block.startBeat / 4) !== Math.floor((block.startBeat + block.duration - 1) / 4)) {
+    if (
+      Math.floor(block.startBeat / beatsPerMeasure) !==
+      Math.floor((block.startBeat + block.duration - 1) / beatsPerMeasure)
+    ) {
       return "A chord block cannot cross a bar line";
     }
     if ((block.degree === null) !== (block.quality === null)) return "Invalid N.C. block";
@@ -392,7 +416,7 @@ async function loadSong(db: D1Database, slug: string, user: SessionUser | null):
   const isOwner = Boolean(user?.allowed && user.id === row.created_by_user_id);
   if (row.status !== "published" && !isOwner) return null;
   const songId = String(row.id);
-  const [blocks, changes, tags, progressions] = await Promise.all([
+  const [blocks, changes, tags, progressions, sections] = await Promise.all([
     db.prepare("SELECT * FROM chord_blocks WHERE song_id = ? ORDER BY start_beat").bind(songId).all<Record<string, unknown>>(),
     db.prepare("SELECT * FROM key_changes WHERE song_id = ? ORDER BY start_beat").bind(songId).all<Record<string, unknown>>(),
     db.prepare(
@@ -404,12 +428,17 @@ async function loadSong(db: D1Database, slug: string, user: SessionUser | null):
        FROM song_progressions sp JOIN progression_names pn ON pn.id = sp.progression_name_id
        WHERE sp.song_id = ? ORDER BY sp.start_beat`,
     ).bind(songId).all<Record<string, unknown>>(),
+    db.prepare(
+      "SELECT id, name, start_beat FROM song_sections WHERE song_id = ? ORDER BY start_beat",
+    ).bind(songId).all<Record<string, unknown>>(),
   ]);
   return {
     id: songId,
     slug: String(row.slug),
     title: String(row.title),
     bpm: Number(row.bpm),
+    timeSignatureNumerator: Number(row.time_signature_numerator),
+    timeSignatureDenominator: Number(row.time_signature_denominator),
     initialKey: Number(row.initial_key),
     sourceUrl: row.source_url ? String(row.source_url) : null,
     status: row.status as Song["status"],
@@ -438,6 +467,11 @@ async function loadSong(db: D1Database, slug: string, user: SessionUser | null):
       name: String(item.name),
       startBeat: Number(item.start_beat),
       endBeat: Number(item.end_beat),
+    })),
+    sections: sections.results.map((item) => ({
+      id: String(item.id),
+      name: String(item.name),
+      startBeat: Number(item.start_beat),
     })),
     canEdit: isOwner,
   };

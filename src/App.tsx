@@ -6,7 +6,7 @@ import { SongPage } from "./pages/SongPage";
 
 export function App() {
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
-  const songMatch = window.location.pathname.match(/^\/songs\/([^/]+)$/);
+  const songMatch = window.location.pathname.match(/^\/songs\/([^/]+)(\/edit)?$/);
 
   useEffect(() => {
     api<{ user: SessionUser | null }>("/api/session").then((data) => setUser(data.user)).catch(() => setUser(null));
@@ -14,7 +14,7 @@ export function App() {
 
   async function createSong() {
     const { slug } = await api<{ slug: string }>("/api/songs", { method: "POST" });
-    window.location.assign(`/songs/${slug}`);
+    window.location.assign(`/songs/${slug}/edit`);
   }
 
   async function logout() {
@@ -44,7 +44,9 @@ export function App() {
         <div className="permission-notice">このアカウントには編集権限がありません。公開メモは閲覧できます。</div>
       )}
       <main>
-        {songMatch ? <SongPage slug={decodeURIComponent(songMatch[1])} /> : <HomePage user={user ?? null} />}
+        {songMatch
+          ? <SongPage slug={decodeURIComponent(songMatch[1])} edit={Boolean(songMatch[2])} />
+          : <HomePage user={user ?? null} />}
       </main>
     </>
   );

@@ -6,6 +6,8 @@ import {
   functionColor,
   keyAtBeat,
   midiVoicing,
+  insertMeasures,
+  positionAfterMeasureInsertion,
   positionAfterMeasureRemoval,
   removeMeasure,
 } from "./music";
@@ -31,6 +33,7 @@ describe("chord notation", () => {
     expect(functionColor({ degree: 0, quality: "augmented", bassDegree: null })).toBe("T");
     expect(functionColor({ degree: 6, quality: "minor", bassDegree: null })).toBe("P");
     expect(functionColor({ degree: 4, quality: "half_diminished7", bassDegree: null })).toBe("T");
+    expect(functionColor({ degree: 4, quality: "minor", bassDegree: null })).toBe("T");
   });
 });
 
@@ -52,6 +55,37 @@ describe("timeline editing", () => {
     expect(removed[0]).toMatchObject({ startBeat: 0, duration: 4, degree: 7 });
     expect(positionAfterMeasureRemoval(2, 0)).toBe(0);
     expect(positionAfterMeasureRemoval(8, 0)).toBe(4);
+  });
+
+  it("inserts empty measures and shifts positions at the insertion point", () => {
+    const blocks = applyAt([nc], 4, 4, { degree: 7, quality: "major", bassDegree: null });
+    const inserted = insertMeasures(blocks, 1, 2);
+    expect(inserted.map((block) => [block.startBeat, block.duration, block.degree])).toEqual([
+      [0, 4, null],
+      [4, 4, null],
+      [8, 4, null],
+      [12, 4, 7],
+    ]);
+    expect(positionAfterMeasureInsertion(3, 1, 2)).toBe(3);
+    expect(positionAfterMeasureInsertion(4, 1, 2)).toBe(12);
+  });
+
+  it("uses the song meter when splitting and inserting measures", () => {
+    const threeFour = applyAt(
+      [nc],
+      0,
+      4,
+      { degree: 0, quality: "major", bassDegree: null },
+      3,
+    );
+    expect(threeFour.map((block) => [block.startBeat, block.duration])).toEqual([
+      [0, 3],
+      [3, 1],
+      [4, 2],
+    ]);
+    const inserted = insertMeasures(threeFour, 1, 1, 3);
+    expect(inserted.find((block) => block.degree === 0 && block.startBeat === 6)).toBeDefined();
+    expect(positionAfterMeasureInsertion(3, 1, 1, 3)).toBe(6);
   });
 });
 

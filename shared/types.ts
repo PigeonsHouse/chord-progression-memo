@@ -28,11 +28,19 @@ export interface ProgressionRange {
   endBeat: number;
 }
 
+export interface SongSection {
+  id: string;
+  name: string;
+  startBeat: number;
+}
+
 export interface Song {
   id: string;
   slug: string;
   title: string;
   bpm: number;
+  timeSignatureNumerator: number;
+  timeSignatureDenominator: number;
   initialKey: number;
   sourceUrl: string | null;
   status: "draft" | "published";
@@ -46,6 +54,7 @@ export interface Song {
   keyChanges: KeyChange[];
   tags: string[];
   progressions: ProgressionRange[];
+  sections: SongSection[];
   canEdit: boolean;
 }
 
