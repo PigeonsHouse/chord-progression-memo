@@ -515,6 +515,28 @@ export function SongEditor({
         </label>
       </section>
 
+      <section className="credits-panel panel">
+        <h2>クレジット</h2>
+        <div className="credits-grid">
+          {([
+            ["vocalCredit", "歌"],
+            ["lyricistCredit", "作詞"],
+            ["composerCredit", "作曲"],
+            ["arrangerCredit", "編曲"],
+          ] as const).map(([key, label]) => (
+            <label key={key}>
+              {label}
+              <input
+                value={song[key] ?? ""}
+                maxLength={200}
+                onChange={(event) => setMeta(key, event.target.value || null)}
+                placeholder={`${label}の名称（任意）`}
+              />
+            </label>
+          ))}
+        </div>
+      </section>
+
       <section className="duration-toolbar panel">
         <div className="width-picker">
           <span>適用幅</span>

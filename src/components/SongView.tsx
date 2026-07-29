@@ -6,6 +6,7 @@ import { Timeline } from "./Timeline";
 
 export function SongView({ song }: { song: Song }) {
   const [activeBeat, setActiveBeat] = useState<number | null>(null);
+  const credits = groupCredits(song);
   return (
     <article className="page song-page">
       <header className="song-heading">
@@ -15,7 +16,7 @@ export function SongView({ song }: { song: Song }) {
             {song.timeSignatureDenominator} · {song.bpm} BPM
           </p>
           <h1>{song.title}</h1>
-          <p className="muted">作成者：{song.creatorName}</p>
+          <p className="muted">メモ作成者：{song.creatorName}</p>
         </div>
         <div className="song-view-actions">
           <PlayerControls song={song} onBeat={setActiveBeat} />
@@ -26,6 +27,16 @@ export function SongView({ song }: { song: Song }) {
           )}
         </div>
       </header>
+      {credits.length > 0 && (
+        <dl className="song-credits">
+          {credits.map((credit) => (
+            <div key={`${credit.roles.join("-")}-${credit.name}`}>
+              <dt>{credit.roles.join("・")}</dt>
+              <dd>{credit.name}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       <div className="tags">
         {song.tags.map((tag) => (
           <span key={tag}>#{tag}</span>
@@ -50,4 +61,20 @@ export function SongView({ song }: { song: Song }) {
       />
     </article>
   );
+}
+
+function groupCredits(song: Song) {
+  const grouped = new Map<string, string[]>();
+  const credits = [
+    ["歌", song.vocalCredit],
+    ["作詞", song.lyricistCredit],
+    ["作曲", song.composerCredit],
+    ["編曲", song.arrangerCredit],
+  ] as const;
+  for (const [role, rawName] of credits) {
+    const name = rawName?.trim();
+    if (!name) continue;
+    grouped.set(name, [...(grouped.get(name) ?? []), role]);
+  }
+  return [...grouped.entries()].map(([name, roles]) => ({ name, roles }));
 }

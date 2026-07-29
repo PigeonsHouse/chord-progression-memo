@@ -85,6 +85,9 @@ h2 { letter-spacing: -.025em; }
 .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 22px; }
 .metadata-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 24px 0 16px; }
 .metadata-grid .title-field { grid-column: span 2; }
+.credits-panel { margin-bottom: 16px; }
+.credits-panel h2 { margin-bottom: 14px; font-size: 1rem; }
+.credits-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 label { display: grid; gap: 6px; color: var(--muted); font-size: .8rem; font-weight: 700; }
 input, select {
   min-width: 0;
@@ -488,6 +491,16 @@ input, select {
 }
 .volume-control > span { text-align: right; }
 .song-heading { margin-bottom: 24px; }
+.song-credits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 20px;
+  margin: -10px 0 20px;
+}
+.song-credits > div { display: flex; gap: 5px; font-size: .84rem; }
+.song-credits dt { color: var(--muted); font-weight: 750; }
+.song-credits dt::after { content: "："; }
+.song-credits dd { margin: 0; color: var(--ink); }
 .song-page .timeline { margin-top: 34px; gap: 0; }
 .song-page .measure-header { padding-inline: 6px; }
 .song-page .measure-annotations { padding-inline: 0; }
@@ -518,6 +531,7 @@ input, select {
   .song-card:nth-child(n) { padding: 22px 0; border-right: 0; }
   .metadata-grid { grid-template-columns: 1fr 1fr; }
   .metadata-grid .title-field { grid-column: span 2; }
+  .credits-grid { grid-template-columns: 1fr 1fr; }
   .palette-row { grid-template-columns: 1fr; gap: 5px; }
   .palette-row h3 { margin-top: 0; }
   .free-picker-grid { grid-template-columns: 1fr 1fr; }

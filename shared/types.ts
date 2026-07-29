@@ -43,6 +43,10 @@ export interface Song {
   timeSignatureDenominator: number;
   initialKey: number;
   sourceUrl: string | null;
+  vocalCredit: string | null;
+  lyricistCredit: string | null;
+  composerCredit: string | null;
+  arrangerCredit: string | null;
   status: "draft" | "published";
   createdByUserId: string;
   creatorName: string;
