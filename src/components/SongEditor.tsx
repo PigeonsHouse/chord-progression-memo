@@ -86,7 +86,9 @@ export function SongEditor({
   const [tagText, setTagText] = useState(song.tags.join(", "));
   const [rangeName, setRangeName] = useState("");
   const [rangeBeats, setRangeBeats] = useState(4);
-  const [editingProgressionId, setEditingProgressionId] = useState<string | null>(null);
+  const [editingProgressionId, setEditingProgressionId] = useState<
+    string | null
+  >(null);
   const [sectionName, setSectionName] = useState("");
   const [measureInsertCount, setMeasureInsertCount] = useState(1);
   const [suggestions, setSuggestions] = useState<{
@@ -310,7 +312,9 @@ export function SongEditor({
     const timelineEnd = Math.max(
       ...song.blocks.map((block) => block.startBeat + block.duration),
     );
-    const editing = song.progressions.find((range) => range.id === editingProgressionId);
+    const editing = song.progressions.find(
+      (range) => range.id === editingProgressionId,
+    );
     const startBeat = editing?.startBeat ?? selectedBeat;
     const endBeat = Math.min(timelineEnd, startBeat + rangeBeats);
     if (endBeat <= startBeat) return;
@@ -318,7 +322,7 @@ export function SongEditor({
       ...current,
       progressions: editing
         ? current.progressions.map((range) =>
-            range.id === editing.id ? { ...range, name, endBeat } : range
+            range.id === editing.id ? { ...range, name, endBeat } : range,
           )
         : [
             ...current.progressions,
@@ -414,6 +418,9 @@ export function SongEditor({
   const remainingBeats = Math.max(1, timelineEnd - progressionStart);
   const coveredProgressions = song.progressions.filter(
     (range) => range.startBeat <= selectedBeat && range.endBeat > selectedBeat,
+  );
+  const selectedSection = song.sections.find(
+    (section) => section.startBeat === selectedBeat,
   );
 
   return (
@@ -518,12 +525,14 @@ export function SongEditor({
       <section className="credits-panel panel">
         <h2>クレジット</h2>
         <div className="credits-grid">
-          {([
-            ["vocalCredit", "歌"],
-            ["lyricistCredit", "作詞"],
-            ["composerCredit", "作曲"],
-            ["arrangerCredit", "編曲"],
-          ] as const).map(([key, label]) => (
+          {(
+            [
+              ["vocalCredit", "歌"],
+              ["lyricistCredit", "作詞"],
+              ["composerCredit", "作曲"],
+              ["arrangerCredit", "編曲"],
+            ] as const
+          ).map(([key, label]) => (
             <label key={key}>
               {label}
               <input
@@ -918,7 +927,11 @@ export function SongEditor({
             {pickerTab === "section" && (
               <div className="picker-tab-panel focused-action">
                 <div>
-                  <h3>ここをセクションの頭にする</h3>
+                  <h3>
+                    {selectedSection
+                      ? "このセクションを編集"
+                      : "ここをセクションの頭にする"}
+                  </h3>
                   <p className="muted">
                     {Math.floor(selectedBeat / beatsPerMeasure) + 1}小節目・
                     {(selectedBeat % beatsPerMeasure) + 1}
@@ -937,16 +950,35 @@ export function SongEditor({
                     {sectionName.length}/50文字
                   </span>
                 </label>
-                <button
-                  className="button primary"
-                  disabled={
-                    sectionName.trim().length < 1 ||
-                    sectionName.trim().length > 50
-                  }
-                  onClick={addSection}
-                >
-                  セクションを追加
-                </button>
+                <div className="section-actions">
+                  {selectedSection && (
+                    <button
+                      className="button danger"
+                      onClick={() => {
+                        update((current) => ({
+                          ...current,
+                          sections: current.sections.filter(
+                            (section) => section.id !== selectedSection.id,
+                          ),
+                        }));
+                        setSectionName("");
+                        setPickerOpen(false);
+                      }}
+                    >
+                      セクションを削除
+                    </button>
+                  )}
+                  <button
+                    className="button primary"
+                    disabled={
+                      sectionName.trim().length < 1 ||
+                      sectionName.trim().length > 50
+                    }
+                    onClick={addSection}
+                  >
+                    {selectedSection ? "名称を変更" : "セクションを追加"}
+                  </button>
+                </div>
               </div>
             )}
 

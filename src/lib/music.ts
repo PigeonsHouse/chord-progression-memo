@@ -97,6 +97,7 @@ export interface BeatValue {
   degree: number | null;
   quality: ChordQuality | null;
   bassDegree: number | null;
+  boundaryBefore?: boolean;
 }
 
 export function expandBlocks(blocks: ChordBlock[]): BeatValue[] {
@@ -118,6 +119,7 @@ export function expandBlocks(blocks: ChordBlock[]): BeatValue[] {
         degree: block.degree,
         quality: block.quality,
         bassDegree: block.bassDegree,
+        boundaryBefore: i === block.startBeat,
       };
     }
   }
@@ -138,6 +140,7 @@ export function compressBeats(
       duration < 4 &&
       Math.floor(start / beatsPerMeasure) ===
         Math.floor((start + duration) / beatsPerMeasure) &&
+      !beats[start + duration].boundaryBefore &&
       sameBeat(value, beats[start + duration])
     ) {
       duration += 1;
@@ -146,7 +149,9 @@ export function compressBeats(
       id: crypto.randomUUID(),
       startBeat: start,
       duration,
-      ...value,
+      degree: value.degree,
+      quality: value.quality,
+      bassDegree: value.bassDegree,
     });
     start += duration;
   }
@@ -164,7 +169,16 @@ export function applyAt(
   while (beats.length < startBeat + width) {
     beats.push({ degree: null, quality: null, bassDegree: null });
   }
-  for (let i = startBeat; i < startBeat + width; i += 1) beats[i] = value;
+  const endBeat = startBeat + width;
+  for (let i = startBeat; i < endBeat; i += 1) {
+    beats[i] = {
+      degree: value.degree,
+      quality: value.quality,
+      bassDegree: value.bassDegree,
+      boundaryBefore: i === startBeat,
+    };
+  }
+  if (endBeat < beats.length) beats[endBeat].boundaryBefore = true;
   while (beats.length % beatsPerMeasure !== 0)
     beats.push({ degree: null, quality: null, bassDegree: null });
   return compressBeats(beats, beatsPerMeasure);

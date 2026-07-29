@@ -27,7 +27,7 @@ export class ChordPlayer {
     startBeat: number,
     onBeat: (beat: number | null) => void,
   ) {
-    this.stop(onBeat);
+    this.stop(() => undefined);
     this.context ??= new AudioContext();
     if (!this.gain) {
       this.gain = this.context.createGain();
@@ -73,6 +73,39 @@ export class ChordPlayer {
       if (beat >= totalBeats) this.stop(onBeat);
       else onBeat(beat);
     }, 50);
+  }
+
+  async playSingle(
+    block: ChordBlock,
+    bpm: number,
+    beatUnit: number,
+    keyPitchClass: number,
+    onBeat: (beat: number | null) => void,
+  ) {
+    this.stop(() => undefined);
+    if (block.degree === null || block.quality === null) return;
+    this.context ??= new AudioContext();
+    if (!this.gain) {
+      this.gain = this.context.createGain();
+      this.gain.connect(this.context.destination);
+    }
+    this.gain.gain.setValueAtTime(this.volume, this.context.currentTime);
+    await this.context.resume();
+    const notes = midiVoicing(block, keyPitchClass);
+    await Promise.all(notes.map((note) => this.load(note)));
+    const secondsPerBeat = 60 / bpm * (QUARTER_NOTE_BEAT_UNIT / beatUnit);
+    const at = this.context.currentTime + 0.02;
+    const stopAt = at + 2 * secondsPerBeat;
+    for (const note of notes) {
+      const source = this.context.createBufferSource();
+      source.buffer = this.buffers.get(note)!;
+      source.connect(this.gain);
+      source.start(at);
+      source.stop(stopAt);
+      this.sources.push(source);
+    }
+    onBeat(block.startBeat);
+    this.timer = window.setTimeout(() => this.stop(onBeat), 2 * secondsPerBeat * 1000);
   }
 
   stop(onBeat: (beat: number | null) => void) {

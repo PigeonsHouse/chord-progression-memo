@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Song } from "../../shared/types";
 import { KEY_NAMES } from "../lib/music";
-import { PlayerControls } from "./PlayerControls";
+import { PlayerControls, type PlayerControlsHandle } from "./PlayerControls";
 import { Timeline } from "./Timeline";
 
 export function SongView({ song }: { song: Song }) {
   const [activeBeat, setActiveBeat] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const playerControls = useRef<PlayerControlsHandle>(null);
   const credits = groupCredits(song);
   return (
     <article className="page song-page">
@@ -19,7 +21,12 @@ export function SongView({ song }: { song: Song }) {
           <p className="muted">メモ作成者：{song.creatorName}</p>
         </div>
         <div className="song-view-actions">
-          <PlayerControls song={song} onBeat={setActiveBeat} />
+          <PlayerControls
+            ref={playerControls}
+            song={song}
+            onBeat={setActiveBeat}
+            onPlayingChange={setPlaying}
+          />
           {song.canEdit && (
             <a className="button" href={`/songs/${song.slug}/edit`}>
               編集する
@@ -57,6 +64,17 @@ export function SongView({ song }: { song: Song }) {
         keyChanges={song.keyChanges}
         beatsPerMeasure={song.timeSignatureNumerator}
         activeBeat={activeBeat}
+        interactive
+        onBeat={(beat) => {
+          if (playing) {
+            void playerControls.current?.playFromBeat(beat);
+            return;
+          }
+          const block = song.blocks.find(
+            (item) => item.startBeat <= beat && item.startBeat + item.duration > beat,
+          );
+          if (block) void playerControls.current?.playSingle(block);
+        }}
         hideTrailingNc
       />
     </article>

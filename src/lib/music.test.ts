@@ -48,6 +48,25 @@ describe("timeline editing", () => {
     ]);
   });
 
+  it("keeps an explicitly applied boundary between identical chords", () => {
+    const wholeMeasure = applyAt(
+      [nc],
+      0,
+      4,
+      { degree: 0, quality: "major", bassDegree: null },
+    );
+    const split = applyAt(
+      wholeMeasure,
+      0,
+      2,
+      { degree: 0, quality: "major", bassDegree: null },
+    );
+    expect(split.map((block) => [block.startBeat, block.duration, block.degree])).toEqual([
+      [0, 2, 0],
+      [2, 2, 0],
+    ]);
+  });
+
   it("removes a whole measure and shifts following beats", () => {
     const blocks = applyAt([nc], 4, 4, { degree: 7, quality: "major", bassDegree: null });
     const removed = removeMeasure(blocks, 0);

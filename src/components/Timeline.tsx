@@ -1,6 +1,11 @@
 import { useState } from "react";
 import type { CSSProperties, MouseEvent } from "react";
-import type { ChordBlock, KeyChange, ProgressionRange, SongSection } from "../../shared/types";
+import type {
+  ChordBlock,
+  KeyChange,
+  ProgressionRange,
+  SongSection,
+} from "../../shared/types";
 import { chordLabel, functionColor, KEY_NAMES } from "../lib/music";
 
 export function Timeline({
@@ -12,6 +17,7 @@ export function Timeline({
   beatsPerMeasure,
   activeBeat,
   editable,
+  interactive,
   hideTrailingNc,
   onBeat,
   onDeleteMeasure,
@@ -24,6 +30,7 @@ export function Timeline({
   beatsPerMeasure: number;
   activeBeat: number | null;
   editable?: boolean;
+  interactive?: boolean;
   hideTrailingNc?: boolean;
   onBeat?: (beat: number) => void;
   onDeleteMeasure?: (measure: number) => void;
@@ -44,7 +51,9 @@ export function Timeline({
     0,
     ...visible.map((block) => block.startBeat + block.duration),
   );
-  const sortedChanges = [...keyChanges].sort((a, b) => a.startBeat - b.startBeat);
+  const sortedChanges = [...keyChanges].sort(
+    (a, b) => a.startBeat - b.startBeat,
+  );
   const keyRanges = [
     {
       id: "initial-key",
@@ -63,7 +72,10 @@ export function Timeline({
   return (
     <div className="timeline">
       {[...measures.entries()].map(([measure, items]) => (
-        <div className={`measure ${editable ? "editable" : ""}`} key={measure}>
+        <div
+          className={`measure ${editable ? "editable" : ""} ${interactive ? "interactive" : ""}`}
+          key={measure}
+        >
           <div className="measure-header">
             <div className="measure-number">{measure + 1}</div>
             {editable && (
@@ -101,11 +113,16 @@ export function Timeline({
           >
             <div className="section-markers" aria-label="セクション">
               {sections
-                .filter((section) => Math.floor(section.startBeat / beatsPerMeasure) === measure)
+                .filter(
+                  (section) =>
+                    Math.floor(section.startBeat / beatsPerMeasure) === measure,
+                )
                 .map((section) => (
                   <span
                     className="section-marker"
-                    style={{ left: `${(section.startBeat % beatsPerMeasure) / beatsPerMeasure * 100}%` }}
+                    style={{
+                      left: `${((section.startBeat % beatsPerMeasure) / beatsPerMeasure) * 100}%`,
+                    }}
                     key={section.id}
                   >
                     {section.name}
@@ -114,7 +131,8 @@ export function Timeline({
             </div>
             {items.map((block) => {
               const color = functionColor(block);
-              const selected = activeBeat !== null &&
+              const selected =
+                activeBeat !== null &&
                 activeBeat >= block.startBeat &&
                 activeBeat < block.startBeat + block.duration;
               return (
@@ -123,16 +141,20 @@ export function Timeline({
                   key={block.id}
                   className={`chord-block ${color ? `function-${color}` : "nc"} ${selected ? "playing" : ""}`}
                   style={{
-                    gridColumn: `${block.startBeat % beatsPerMeasure + 1} / span ${block.duration}`,
+                    gridColumn: `${(block.startBeat % beatsPerMeasure) + 1} / span ${block.duration}`,
                   }}
-                  onClick={(event) => editable && onBeat?.(beatFromClick(event, block))}
-                  onMouseMove={(event) => editable && setHoveredBeat(beatFromClick(event, block))}
+                  onClick={(event) =>
+                    (editable || interactive) &&
+                    onBeat?.(beatFromClick(event, block))
+                  }
+                  onMouseMove={(event) =>
+                    editable && setHoveredBeat(beatFromClick(event, block))
+                  }
                   onMouseLeave={() => setHoveredBeat(null)}
-                  disabled={!editable}
+                  disabled={!editable && !interactive}
                   aria-label={`${chordLabel(block)}、${block.duration}拍`}
                 >
                   <span className="chord-name">{chordLabel(block)}</span>
-                  <span className="duration">{block.duration}拍</span>
                 </button>
               );
             })}
@@ -142,7 +164,7 @@ export function Timeline({
                 <span
                   className="beat-hover"
                   style={{
-                    left: `${(hoveredBeat % beatsPerMeasure) / beatsPerMeasure * 100}%`,
+                    left: `${((hoveredBeat % beatsPerMeasure) / beatsPerMeasure) * 100}%`,
                     width: `${100 / beatsPerMeasure}%`,
                   }}
                   aria-hidden="true"
@@ -151,7 +173,9 @@ export function Timeline({
               )}
             {editable && (
               <div className="beat-grid" aria-hidden="true">
-                {Array.from({ length: beatsPerMeasure }, (_, beat) => <i key={beat} />)}
+                {Array.from({ length: beatsPerMeasure }, (_, beat) => (
+                  <i key={beat} />
+                ))}
               </div>
             )}
           </div>
@@ -184,7 +208,10 @@ function AnnotationTrack({
   return (
     <div className="annotation-track">
       {ranges
-        .filter((range) => range.startBeat < measureEnd && range.endBeat > measureStart)
+        .filter(
+          (range) =>
+            range.startBeat < measureEnd && range.endBeat > measureStart,
+        )
         .map((range) => {
           const start = Math.max(range.startBeat, measureStart);
           const end = Math.min(range.endBeat, measureEnd);
@@ -197,13 +224,15 @@ function AnnotationTrack({
             measure % 4 === 3 ? "medium-row-end" : "",
             measure % 2 === 0 ? "compact-row-start" : "",
             measure % 2 === 1 ? "compact-row-end" : "",
-          ].filter(Boolean).join(" ");
+          ]
+            .filter(Boolean)
+            .join(" ");
           return (
             <span
               className={`timeline-annotation ${kind}-annotation ${segmentClasses}`}
               style={{
-                left: `${(start - measureStart) / beatsPerMeasure * 100}%`,
-                width: `${(end - start) / beatsPerMeasure * 100}%`,
+                left: `${((start - measureStart) / beatsPerMeasure) * 100}%`,
+                width: `${((end - start) / beatsPerMeasure) * 100}%`,
               }}
               title={range.name}
               key={range.id}
@@ -218,10 +247,15 @@ function AnnotationTrack({
 
 function assignRangeLanes(ranges: ProgressionRange[]) {
   const lanes: ProgressionRange[][] = [];
-  for (const range of [...ranges].sort((a, b) => a.startBeat - b.startBeat || a.endBeat - b.endBeat)) {
-    const lane = lanes.find((items) => items.every(
-      (item) => item.endBeat <= range.startBeat || item.startBeat >= range.endBeat,
-    ));
+  for (const range of [...ranges].sort(
+    (a, b) => a.startBeat - b.startBeat || a.endBeat - b.endBeat,
+  )) {
+    const lane = lanes.find((items) =>
+      items.every(
+        (item) =>
+          item.endBeat <= range.startBeat || item.startBeat >= range.endBeat,
+      ),
+    );
     if (lane) lane.push(range);
     else lanes.push([range]);
   }
@@ -236,8 +270,14 @@ function TrashIcon() {
   );
 }
 
-function beatFromClick(event: MouseEvent<HTMLButtonElement>, block: ChordBlock) {
+function beatFromClick(
+  event: MouseEvent<HTMLButtonElement>,
+  block: ChordBlock,
+) {
   const box = event.currentTarget.getBoundingClientRect();
-  const offset = Math.min(block.duration - 1, Math.floor((event.clientX - box.left) / box.width * block.duration));
+  const offset = Math.min(
+    block.duration - 1,
+    Math.floor(((event.clientX - box.left) / box.width) * block.duration),
+  );
   return block.startBeat + Math.max(0, offset);
 }

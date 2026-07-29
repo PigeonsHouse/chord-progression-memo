@@ -1,14 +1,18 @@
-import { useRef, useState } from "react";
-import type { Song } from "../../shared/types";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import type { ChordBlock, Song } from "../../shared/types";
+import { keyAtBeat } from "../lib/music";
 import { ChordPlayer } from "../lib/player";
 
-export function PlayerControls({
-  song,
-  onBeat,
-}: {
+export interface PlayerControlsHandle {
+  playFromBeat: (beat: number) => Promise<void>;
+  playSingle: (block: ChordBlock) => Promise<void>;
+}
+
+export const PlayerControls = forwardRef<PlayerControlsHandle, {
   song: Song;
   onBeat: (beat: number | null) => void;
-}) {
+  onPlayingChange?: (playing: boolean) => void;
+}>(function PlayerControls({ song, onBeat, onPlayingChange }, ref) {
   const player = useRef(new ChordPlayer());
   const [playing, setPlaying] = useState(false);
   const [startPoint, setStartPoint] = useState("song-start");
@@ -24,14 +28,17 @@ export function PlayerControls({
     window.localStorage.setItem("chord-memo-volume", String(next));
   }
 
-  async function play() {
+  function changePlaying(next: boolean) {
+    setPlaying(next);
+    onPlayingChange?.(next);
+  }
+
+  async function playFromBeat(startBeat: number) {
     setError("");
     player.current.stop(onBeat);
-    const startBeat =
-      song.sections.find((section) => section.id === startPoint)?.startBeat ??
-      0;
+    onBeat(null);
     try {
-      setPlaying(true);
+      changePlaying(true);
       player.current.setVolume(volume / 100);
       await player.current.play(
         song.blocks,
@@ -42,20 +49,49 @@ export function PlayerControls({
         startBeat,
         (beat) => {
           onBeat(beat);
-          if (beat === null) setPlaying(false);
+          if (beat === null) changePlaying(false);
         },
       );
     } catch (reason) {
-      setPlaying(false);
+      changePlaying(false);
       setError(
         reason instanceof Error ? reason.message : "再生できませんでした",
       );
     }
   }
 
+  async function play() {
+    const startBeat =
+      song.sections.find((section) => section.id === startPoint)?.startBeat ??
+      0;
+    await playFromBeat(startBeat);
+  }
+
+  async function playSingle(block: ChordBlock) {
+    setError("");
+    changePlaying(false);
+    onBeat(null);
+    player.current.setVolume(volume / 100);
+    try {
+      await player.current.playSingle(
+        block,
+        song.bpm,
+        song.timeSignatureDenominator,
+        keyAtBeat(song.initialKey, song.keyChanges, block.startBeat),
+        onBeat,
+      );
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "コードを再生できませんでした",
+      );
+    }
+  }
+
+  useImperativeHandle(ref, () => ({ playFromBeat, playSingle }));
+
   function stop() {
     player.current.stop(onBeat);
-    setPlaying(false);
+    changePlaying(false);
   }
 
   const sections = [...song.sections].sort((a, b) => a.startBeat - b.startBeat);
@@ -98,7 +134,7 @@ export function PlayerControls({
       {error && <span className="error">{error}</span>}
     </div>
   );
-}
+});
 
 function VolumeIcon({ muted }: { muted: boolean }) {
   return (
