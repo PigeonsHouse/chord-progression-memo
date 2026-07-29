@@ -86,6 +86,7 @@ export function SongEditor({
   const [tagText, setTagText] = useState(song.tags.join(", "));
   const [rangeName, setRangeName] = useState("");
   const [rangeBeats, setRangeBeats] = useState(4);
+  const [editingProgressionId, setEditingProgressionId] = useState<string | null>(null);
   const [sectionName, setSectionName] = useState("");
   const [measureInsertCount, setMeasureInsertCount] = useState(1);
   const [suggestions, setSuggestions] = useState<{
@@ -161,6 +162,8 @@ export function SongEditor({
     setSectionName(
       song.sections.find((section) => section.startBeat === beat)?.name ?? "",
     );
+    setEditingProgressionId(null);
+    setRangeName("");
     setPickerTab("chord");
     setPickerOpen(true);
   }
@@ -307,21 +310,28 @@ export function SongEditor({
     const timelineEnd = Math.max(
       ...song.blocks.map((block) => block.startBeat + block.duration),
     );
-    const endBeat = Math.min(timelineEnd, selectedBeat + rangeBeats);
-    if (endBeat <= selectedBeat) return;
+    const editing = song.progressions.find((range) => range.id === editingProgressionId);
+    const startBeat = editing?.startBeat ?? selectedBeat;
+    const endBeat = Math.min(timelineEnd, startBeat + rangeBeats);
+    if (endBeat <= startBeat) return;
     update((current) => ({
       ...current,
-      progressions: [
-        ...current.progressions,
-        {
-          id: crypto.randomUUID(),
-          name,
-          startBeat: selectedBeat,
-          endBeat,
-        },
-      ],
+      progressions: editing
+        ? current.progressions.map((range) =>
+            range.id === editing.id ? { ...range, name, endBeat } : range
+          )
+        : [
+            ...current.progressions,
+            {
+              id: crypto.randomUUID(),
+              name,
+              startBeat,
+              endBeat,
+            },
+          ],
     }));
     setRangeName("");
+    setEditingProgressionId(null);
     setPickerOpen(false);
   }
 
@@ -397,7 +407,14 @@ export function SongEditor({
   const timelineEnd = Math.max(
     ...song.blocks.map((block) => block.startBeat + block.duration),
   );
-  const remainingBeats = Math.max(1, timelineEnd - selectedBeat);
+  const editingProgression = song.progressions.find(
+    (range) => range.id === editingProgressionId,
+  );
+  const progressionStart = editingProgression?.startBeat ?? selectedBeat;
+  const remainingBeats = Math.max(1, timelineEnd - progressionStart);
+  const coveredProgressions = song.progressions.filter(
+    (range) => range.startBeat <= selectedBeat && range.endBeat > selectedBeat,
+  );
 
   return (
     <article className="page editor-page">
@@ -751,13 +768,74 @@ export function SongEditor({
 
             {pickerTab === "progression" && (
               <div className="picker-tab-panel focused-action">
+                {coveredProgressions.length > 0 && (
+                  <div className="covered-progressions">
+                    <h3>この拍にかかっている進行メモ</h3>
+                    <ul>
+                      {coveredProgressions.map((range) => (
+                        <li key={range.id}>
+                          <span>
+                            <strong>{range.name}</strong>
+                            {range.endBeat - range.startBeat}拍
+                          </span>
+                          <span className="covered-progression-actions">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingProgressionId(range.id);
+                                setRangeName(range.name);
+                                setRangeBeats(range.endBeat - range.startBeat);
+                              }}
+                            >
+                              編集
+                            </button>
+                            <button
+                              type="button"
+                              className="danger-text"
+                              onClick={() => {
+                                update((current) => ({
+                                  ...current,
+                                  progressions: current.progressions.filter(
+                                    (item) => item.id !== range.id,
+                                  ),
+                                }));
+                                if (editingProgressionId === range.id) {
+                                  setEditingProgressionId(null);
+                                  setRangeName("");
+                                }
+                              }}
+                            >
+                              削除
+                            </button>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div>
-                  <h3>ここから進行メモを追加</h3>
+                  <h3>
+                    {editingProgression
+                      ? "進行メモを編集"
+                      : "ここから進行メモを追加"}
+                  </h3>
                   <p className="muted">
-                    {Math.floor(selectedBeat / beatsPerMeasure) + 1}小節目・
-                    {(selectedBeat % beatsPerMeasure) + 1}
+                    {Math.floor(progressionStart / beatsPerMeasure) + 1}
+                    小節目・{(progressionStart % beatsPerMeasure) + 1}
                     拍目を開始位置にします。
                   </p>
+                  {editingProgression && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => {
+                        setEditingProgressionId(null);
+                        setRangeName("");
+                      }}
+                    >
+                      新規追加に戻る
+                    </button>
+                  )}
                 </div>
                 <label>
                   進行名
@@ -810,7 +888,7 @@ export function SongEditor({
                   disabled={!rangeName.trim()}
                   onClick={addProgression}
                 >
-                  進行メモを追加
+                  {editingProgression ? "変更を保存" : "進行メモを追加"}
                 </button>
               </div>
             )}

@@ -188,18 +188,16 @@ function AnnotationTrack({
         .map((range) => {
           const start = Math.max(range.startBeat, measureStart);
           const end = Math.min(range.endBeat, measureEnd);
-          const segmentClasses = kind === "key"
-            ? [
-                start === range.startBeat ? "actual-start" : "",
-                end === range.endBeat ? "actual-end" : "",
-                measure % 8 === 0 ? "wide-row-start" : "",
-                measure % 8 === 7 ? "wide-row-end" : "",
-                measure % 4 === 0 ? "medium-row-start" : "",
-                measure % 4 === 3 ? "medium-row-end" : "",
-                measure % 2 === 0 ? "compact-row-start" : "",
-                measure % 2 === 1 ? "compact-row-end" : "",
-              ].filter(Boolean).join(" ")
-            : "";
+          const segmentClasses = [
+            start === range.startBeat ? "actual-start" : "",
+            end === range.endBeat ? "actual-end" : "",
+            measure % 8 === 0 ? "wide-row-start" : "",
+            measure % 8 === 7 ? "wide-row-end" : "",
+            measure % 4 === 0 ? "medium-row-start" : "",
+            measure % 4 === 3 ? "medium-row-end" : "",
+            measure % 2 === 0 ? "compact-row-start" : "",
+            measure % 2 === 1 ? "compact-row-end" : "",
+          ].filter(Boolean).join(" ");
           return (
             <span
               className={`timeline-annotation ${kind}-annotation ${segmentClasses}`}
