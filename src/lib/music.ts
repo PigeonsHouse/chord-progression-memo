@@ -233,6 +233,24 @@ export function insertMeasures(
   return compressBeats(beats, beatsPerMeasure);
 }
 
+export function appendMeasureRange(
+  blocks: ChordBlock[],
+  startMeasure: number,
+  endMeasure: number,
+  beatsPerMeasure = DEFAULT_BEATS_PER_MEASURE,
+) {
+  const beats = expandBlocks(blocks);
+  while (beats.length % beatsPerMeasure !== 0)
+    beats.push({ degree: null, quality: null, bassDegree: null });
+  const startBeat = startMeasure * beatsPerMeasure;
+  const endBeat = (endMeasure + 1) * beatsPerMeasure;
+  const copied = beats.slice(startBeat, endBeat).map((beat, index) => ({
+    ...beat,
+    boundaryBefore: index === 0 || beat.boundaryBefore,
+  }));
+  return compressBeats([...beats, ...copied], beatsPerMeasure);
+}
+
 export function positionAfterMeasureInsertion(
   position: number,
   measureIndex: number,

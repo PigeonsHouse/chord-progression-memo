@@ -4,6 +4,7 @@ import type { ChordQuality, Song } from "../../shared/types";
 import { api } from "../api";
 import {
   addMeasure,
+  appendMeasureRange,
   applyAt,
   chordLabel,
   degreeLabel,
@@ -91,6 +92,8 @@ export function SongEditor({
   >(null);
   const [sectionName, setSectionName] = useState("");
   const [measureInsertCount, setMeasureInsertCount] = useState(1);
+  const [copyStartMeasure, setCopyStartMeasure] = useState(1);
+  const [copyEndMeasure, setCopyEndMeasure] = useState(1);
   const [suggestions, setSuggestions] = useState<{
     tags: string[];
     progressions: string[];
@@ -402,6 +405,52 @@ export function SongEditor({
     setPickerOpen(false);
   }
 
+  function duplicateMeasureRange() {
+    if (
+      !Number.isInteger(copyStartMeasure) ||
+      !Number.isInteger(copyEndMeasure) ||
+      copyStartMeasure < 1 ||
+      copyEndMeasure < copyStartMeasure ||
+      copyEndMeasure > measureCount
+    ) return;
+    const sourceStart = (copyStartMeasure - 1) * beatsPerMeasure;
+    const sourceEnd = copyEndMeasure * beatsPerMeasure;
+    const appendStart = measureCount * beatsPerMeasure;
+    const offset = appendStart - sourceStart;
+    update((current) => {
+      const copiedProgressions = current.progressions
+        .filter((range) => range.startBeat < sourceEnd && range.endBeat > sourceStart)
+        .map((range) => ({
+          ...range,
+          id: crypto.randomUUID(),
+          startBeat: Math.max(range.startBeat, sourceStart) + offset,
+          endBeat: Math.min(range.endBeat, sourceEnd) + offset,
+        }));
+      const copiedSections = current.sections
+        .filter((section) => section.startBeat >= sourceStart && section.startBeat < sourceEnd)
+        .map((section) => ({
+          ...section,
+          id: crypto.randomUUID(),
+          startBeat: section.startBeat + offset,
+        }));
+      return {
+        ...current,
+        blocks: appendMeasureRange(
+          current.blocks,
+          copyStartMeasure - 1,
+          copyEndMeasure - 1,
+          beatsPerMeasure,
+        ),
+        progressions: [...current.progressions, ...copiedProgressions],
+        sections: [...current.sections, ...copiedSections].sort(
+          (a, b) => a.startBeat - b.startBeat,
+        ),
+      };
+    });
+    setSelectedBeat(appendStart);
+    setPickerOpen(false);
+  }
+
   async function deleteSong() {
     if (!window.confirm("このコードメモを削除します。元に戻せません。")) return;
     await api(`/api/songs/${song.id}`, { method: "DELETE" });
@@ -411,6 +460,7 @@ export function SongEditor({
   const timelineEnd = Math.max(
     ...song.blocks.map((block) => block.startBeat + block.duration),
   );
+  const measureCount = Math.ceil(timelineEnd / beatsPerMeasure);
   const editingProgression = song.progressions.find(
     (range) => range.id === editingProgressionId,
   );
@@ -563,19 +613,57 @@ export function SongEditor({
 
       <div className="timeline-actions">
         <p>入力を開始する拍を選ぶとコードパレットが開きます。</p>
-        <button
-          onClick={() =>
-            update((current) => ({
-              ...current,
-              blocks: addMeasure(
-                current.blocks,
-                current.timeSignatureNumerator,
-              ),
-            }))
-          }
-        >
-          小節を追加
-        </button>
+        <div className="timeline-action-buttons">
+          <button
+            onClick={() =>
+              update((current) => ({
+                ...current,
+                blocks: addMeasure(
+                  current.blocks,
+                  current.timeSignatureNumerator,
+                ),
+              }))
+            }
+          >
+            小節を追加
+          </button>
+          <div className="measure-copy-compact" aria-label="小節範囲を曲末に複製">
+            <span>複製</span>
+            <input
+              type="number"
+              min="1"
+              max={measureCount}
+              value={copyStartMeasure}
+              onChange={(event) =>
+                setCopyStartMeasure(Number(event.target.value))
+              }
+              aria-label="複製する開始小節"
+            />
+            <span>〜</span>
+            <input
+              type="number"
+              min={copyStartMeasure}
+              max={measureCount}
+              value={copyEndMeasure}
+              onChange={(event) =>
+                setCopyEndMeasure(Number(event.target.value))
+              }
+              aria-label="複製する終了小節"
+            />
+            <button
+              disabled={
+                !Number.isInteger(copyStartMeasure) ||
+                !Number.isInteger(copyEndMeasure) ||
+                copyStartMeasure < 1 ||
+                copyEndMeasure < copyStartMeasure ||
+                copyEndMeasure > measureCount
+              }
+              onClick={duplicateMeasureRange}
+            >
+              末尾へ
+            </button>
+          </div>
+        </div>
       </div>
       <Timeline
         blocks={song.blocks}

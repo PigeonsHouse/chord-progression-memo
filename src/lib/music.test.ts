@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ChordBlock } from "../../shared/types";
 import {
   applyAt,
+  appendMeasureRange,
   chordLabel,
   functionColor,
   keyAtBeat,
@@ -105,6 +106,21 @@ describe("timeline editing", () => {
     const inserted = insertMeasures(threeFour, 1, 1, 3);
     expect(inserted.find((block) => block.degree === 0 && block.startBeat === 6)).toBeDefined();
     expect(positionAfterMeasureInsertion(3, 1, 1, 3)).toBe(6);
+  });
+
+  it("appends an inclusive range of measures", () => {
+    const twoMeasures = applyAt(
+      [nc],
+      4,
+      4,
+      { degree: 7, quality: "major", bassDegree: null },
+    );
+    const duplicated = appendMeasureRange(twoMeasures, 0, 0);
+    expect(duplicated.map((block) => [block.startBeat, block.duration, block.degree])).toEqual([
+      [0, 4, null],
+      [4, 4, 7],
+      [8, 4, null],
+    ]);
   });
 });
 
